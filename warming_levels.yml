@@ -1,0 +1,23 @@
+name: warming_levels-env
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.7
+
+  # core python
+  - numpy
+  - pandas
+  - scipy
+
+  # spatial
+  - xarray
+  - zarr
+  - netCDF4
+
+  # specialty
+  - fsspec
+  - gcsfs
+  - cftime
+  - dask
