@@ -1,6 +1,6 @@
 # Warming_levels
 
-This repository contains code for calculating global warming levels from CMIP6 data. CMIP6 data is sourced programatically from Google Cloud in zarr format. This repo contains functions for calculating global mean surface temperature (GMST), multiple approaches for calculating warming years, and functions for aggregating warming years to warming levels.
+This repository contains code for calculating global warming levels from CMIP6 data. CMIP6 data is sourced programatically from Google Cloud in zarr format. This repo contains functions for calculating global mean surface temperature (GMST), multiple approaches for calculating warming years, and functions for aggregating warming years to warming levels. A comprehensive description of this work is available in the report at https://docs.google.com/document/d/1NgpzSMPKjkMQFcNMlJDy8rcISbtpEHkQRuPF887OaXQ/edit#.
 
 ## Content Description
 
@@ -36,6 +36,9 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
 7. output_warming_years_annual_pr_and_tas_datasets.ipynb creates datasets of mean annual temperature or annual precipitation for every possible model, member, scenario combination available on Google Cloud, for each warming year identified via a warming level and temperature tolerance approach, and for each lat/lon point on a common grid. This results in one dataset per model/member/scenario combination. From these datasets, the code also creates aggregated datasets that are the average across years and members (resulting in one file for each model and scenario).
 
+8. make_warming_year_table_for_21yr_best_subset.ipynb creates a table of warming years using the 21 year moving window approach and the best subset of models, members, and scenarios as described in the report. Can also be used for generating warming year tables for other moving windows (other than 21 years).
+
+9. make_warming_year_table_for_temperature_window_best_subset.ipynb creates a table of warming years using the temperature window approach and the best subset of models, members, and scenarios as described in the report. Can be used for generating warming year tables for other temperature windows and warming levels.
 
 
 ## Requirements
