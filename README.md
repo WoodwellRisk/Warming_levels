@@ -40,7 +40,7 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
 9. make_warming_year_table_for_temperature_window_best_subset.ipynb creates a table of warming years using the temperature window approach and the best subset of models, members, and scenarios as described in the report. Can be used for generating warming year tables for other temperature windows and warming levels.
 
-10. output_aggregated_warming_level_datasets.ipynb ingests all the warming years in the 'best subset' warming year tables and averageds across all models, members, scenarios, and years at once for each warming level to create two netCDF files: one for mean annual temperature and one for annual precipitation. Both contain data for each warming level on a 0.5° global grid.
+10. output_aggregated_warming_level_datasets.ipynb ingests all the warming years in the 'best subset' warming year tables and averages across all models, members, scenarios, and years at once for each warming level to create two netCDF files: one for mean annual temperature and one for annual precipitation. Both contain data for each warming level on a 0.5° global grid.
 
 ## Requirements
 Warming_levels codes are written in Python 3. The Python environment used to run the code is available in the warming_levels.yml file.
