@@ -79,11 +79,14 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     # calculate warming for each year relative to 1850-1900 base period
     gmst_table['warming'] = gmst_table['GMST'] - gmst_table['1850-1900']
     
+    # create a new copy of mms_table so that the original is not modified
+    mms = mms_table.copy()
+    
     # add historical scenario to mms_table so that historical warming years get incorporated as well
-    mms_table.loc[len(mms_table.index)] = [mms_table['model'].iloc[0], mms_table['member'].iloc[0], 'historical']
+    mms.loc[len(mms.index)] = [mms['model'].iloc[0], mms['member'].iloc[0], 'historical']
 
     # select only model/member/scenario combinations that are in mms_table    
-    gmst_table = pd.merge(gmst_table, mms_table, how='right', on=['model','member','scenario'])
+    gmst_table = pd.merge(gmst_table, mms, how='right', on=['model','member','scenario'])
 
     # filter to only years within temp_tolerance
     mn = warming_level - temp_tolerance
@@ -91,7 +94,7 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     outdf = gmst_table.loc[(gmst_table['warming'] > mn) & (gmst_table['warming'] < mx)]
     
     # add a row with warming_year=NaN for any model/member/scenario combination that did not have any warming years
-    outdf = pd.merge(outdf, mms_table, how='outer', on = ['model','member','scenario'])
+    outdf = pd.merge(outdf, mms, how='outer', on = ['model','member','scenario'])
     
     # clean up the output dataframe
     outdf = outdf.drop(labels=['GMST','1850-1900','warming'], axis=1)
