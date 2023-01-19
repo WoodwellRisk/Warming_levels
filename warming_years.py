@@ -7,26 +7,43 @@ import fsspec
 import xarray as xr
 
 
-
-# examples of calling functions:
-#wltable = calc_warming_years_rolling_mean(mms, 1.5, 21)
-#wltable = calc_warming_years_temperature_window(mms, 1, .1)
-#out = get_cmip6_data('ACCESS-CM2','r1i1p1f1','SSP585','tas','2020-01','2040-12','mydata.nc')
-#out = get_cmip6_data_at_warming_years(model='ACCESS-CM2', member='r1i1p1f1', scenario='ssp585', cmip6_variable='tas', warming_years=np.array([2010,2021,2024]), year_window=5, outfilename='mydata.nc')
-
-
-
 def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
-    # mms_table is a pandas dataframe containing one row for each model, member, scenario combination that you wish to calculate warming years for
-    # warming_level is the global warming level in degrees C to calculate warming years for
-    # window_size is the number of years (integer) to include in the rolling mean window. 
-    #   The table the risk team often uses employs a window_size of 21
-    #   if the window_size is an odd number, the rolling mean is assigned to the middle year (e.g. for window_size=21, the rolling mean is assigned
-    #     to the 11th year)
-    #   if the window_size is an even number, the rolling mean is assigned to the year (window_size/2)+1 (e.g. for window_size=20, the rolling mean 
-    #     is assigned to the 11th year; same approach as https://github.com/mathause/cmip_warming_levels)
-    # returns a pandas dataframe that is the mms_table with one column added for the warming year
-    #   model/member/scenario combinations that do not reach the warming level are assigned a value of NaN for the warming year
+    """Calculate warming years using a rolling window approach.
+    
+    This function calculates warming years for each model/member/scenario 
+    combination in mms_table and for the specified warming level as the middle 
+    year of the first period of years (of length window_size) with mean annual 
+    temperature greater than the specified warming level.
+    
+    Args:
+        mms_table (dataframe) : pandas dataframe containing one row for each 
+        model, member, scenario combination that you wish to calculate warming 
+        years for.
+    
+        warming_level (float) : global warming level in degrees C to calculate 
+        warming years for.
+        
+        window_size (int) : number of years to include in the rolling mean 
+        window. The table the risk team often uses employs a window_size of 
+        21. If the window_size is an odd number, the rolling mean is assigned 
+        to the middle year (e.g. for window_size=21, the rolling mean is 
+        assigned to the 11th year). If the window_size is an even number, the 
+        rolling mean is assigned to the year (window_size/2)+1 (e.g. for 
+        window_size=20, the rolling mean is assigned to the 11th year; same 
+        approach as https://github.com/mathause/cmip_warming_levels)
+    
+    Returns: 
+        A pandas dataframe that is the mms_table with one column added for the 
+        warming year. Model/member/scenario combinations that do not reach the 
+        warming level are assigned a value of NaN for the warming year
+    
+    Example:
+        mms = pd.DataFrame({'model': ['ACCESS-CM2']*3,
+                            'member': ['r1i1p1f1']*3,
+                            'scenario': ['ssp126','ssp245','ssp585']})
+        warming_year_table = calc_warming_years_rolling_mean(mms, 1.5, 21)
+    
+    """
     
     # setup the output dataframe
     outdf = mms_table
@@ -61,15 +78,41 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
 
 
 def calc_warming_years_temperature_window(mms_table, warming_level, temp_tolerance):
-    # mms_table is a pandas dataframe containing one row for each model, member, scenario combination that you wish to calculate warming years for
-    # warming_level is the global warming level in degrees C to calculate warming years for
-    # temp_tolerance is the temperature tolerance in degrees C around the warming level that is used to identify warming years.
-    #   For example, if warming_level=2 and temp_tolerance=0.25, then years with warming >1.75 and <2.25 will be selected
+    """Calculate warming years using a temperature window approach.
+    
+    This function calculates warming years for each model/member/scenario 
+    combination in mms_table and the specified warming level as any year with 
+    mean annual warming in the range of the warming level +/- the temperature 
+    tolerance.
 
-    # returns a pandas dataframe that has the same columns as mms_table plus one column for the warming_year. 
-    #   There is a row for each model/member/scenario/warming_year combination.
-    #   model/member/scenario combinations that do not reach the warming level are given one row and assigned a value of NaN for the warming year
+    Args: 
+        mms_table (dataframe) : pandas dataframe containing one row for each 
+        model, member, scenario combination that you wish to calculate warming 
+        years for.
+        
+        warming_level (float) : global warming level in degrees C to calculate 
+        warming years for.
+        
+        temp_tolerance (float) : temperature tolerance in degrees C around the 
+        warming level that is used to identify warming years. For example, if 
+        warming_level=2 and temp_tolerance=0.25, then years with warming 
+        >1.75C and <2.25C will be selected
 
+    Returns:
+        A pandas dataframe that has the same columns as mms_table plus one 
+        column for the warming_year. There is a row for each 
+        model/member/scenario/warming_year combination. Model/member/scenario 
+        combinations that do not reach the specified warming level are given 
+        one row and assigned a value of NaN for the warming year.
+        
+    Example:
+        mms = pd.DataFrame({'model': ['ACCESS-CM2']*3,
+                            'member': ['r1i1p1f1']*3,
+                            'scenario': ['ssp126','ssp245','ssp585']})
+        warming_year_table = calc_warming_years_temperature_window(mms, 1, .1)
+ 
+    """
+    
     # import the gmst data
     gmst_table = pd.read_csv('/home/abbylute/alute_bucket/warming_levels/data/gmst_tables/CMIP6_GMST_table_all.csv')
 
@@ -104,16 +147,53 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     
 
 def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_mo, outfilename):
+    """Download CMIP6 data from Google Cloud.
     
-    # model:           name of the cmip6 model to import data for
-    # member:          ensemble member (aka realization) to import data for (e.g. r1i1p1f1)
-    # scenario:        CMIP6 scenario to import data for (e.g. historical, ssp585)
-    # cmip6_variable:  name of the cmip6 variable to import data for (e.g. tas, pr)
-    # start_yr_mo:     the first year and month to grab data for. Format should be YYYY-MM. e.g. '2012-01' for January 2012
-    # end_yr_mo:       the last year and month to grab data for. Format should be YYYY-MM.
-    # outfilename:     file name to save data to. Should end in '.nc'. If outfilename=None, data will be returned but not saved to file
+    This function downloads monthly CMIP6 data from Google Cloud for the 
+    specified model, member, scenario, and variable for the period starting in 
+    the year and month specified by start_yr_mo and ending in the year and 
+    month specified by end_yr_mo. Longitude is shifted from [0 360] to [-180 
+    180]. Includes the option of saving the data to file.
     
-    # returns an xarray dataset (and can save a netcdf file) of global (spatially explicit) monthly cmip6 data for the variable of interest for the specified model, member, and scenario
+    Args:
+        model (string) : name of the CMIP6 model to download data for (e.g. 
+        'ACCESS-CM2')
+        
+        member (string) : ensemble member (aka realization) to download data 
+        for (e.g. 'r1i1p1f1')
+    
+        scenario (string) : CMIP6 scenario to download data for (e.g. 
+        'historical' or 'ssp585')
+    
+        cmip6_variable (string) : name of the CMIP6 variable to download data 
+        for (e.g. 'tas' or 'pr')
+        
+        start_yr_mo (string) : the first year and month to grab data for. 
+        Format should be 'YYYY-MM', e.g. '2012-01' for January 2012
+        
+        end_yr_mo (string) : the last year and month to grab data for. Format 
+        should be 'YYYY-MM'.
+        
+        outfilename (string) : file name to save data to. Should end in '.nc'. 
+        If outfilename=None, data will be returned but not saved to file
+        
+    Returns:
+        An xarray dataset (and can save a netcdf file) of global (spatially 
+        explicit) monthly CMIP6 data for the variable of interest for the 
+        specified model, member, and scenario.
+        
+    Raises:
+        ValueError: If scenario='historical' but start_yr_mo or end_yr_mo 
+        refer to dates after 2014.
+        
+        ValueError: If an output file name is specified but it does not end in 
+        '.nc'.
+    
+    Example:
+        cmip6_data = get_cmip6_data('ACCESS-CM2', 'r1i1p1f1', 'SSP585', 'tas', 
+        '2020-01', '2040-12', 'mydata.nc')
+
+    """
     
     # check arguments
     member = member.lower()
@@ -198,19 +278,68 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
 
 
 def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, warming_years, year_window=0, outfilename=None):
+    """Download CMIP6 data from Google Cloud for specific years.
     
-    # model:           name of the cmip6 model to import data for
-    # member:          ensemble member (aka realization) to import data for (e.g. r1i1p1f1)
-    # scenario:        CMIP6 scenario to import data for (e.g. historical, ssp585)
-    # cmip6_variable:  name of the cmip6 variable to import data for (e.g. tas, pr)
-    # warming_years:   a numpy array of years to extract data for. They do not need to be consecutive. (e.g. [2010,2014,2020,2021])
-    # year_window:     an integer specifying additional years to include either side of each specified warming_year. 
-    #                  For example, if warming_years = [2010,2017] and year_window=0, then only data for years 2010 and 2017 will be included.
-    #                  If warming_years = [2010,2017] and year_window=2, then data within +/- 2 years of the warming_years will be included (i.e. 
-    #                  [2008,2009,2010,2011,2012,2015,2016,2017,2018,2019])
-    # outfilename:     file name to save data to. If outfilename=None, data will be returned but not saved to file. Otherwise it should end in '.nc'. 
+    This function downloads monthly CMIP6 data from Google Cloud for the 
+    specified model, member, scenario, variable, and years. The years 
+    downloaded are specified by warming_years and can include a window of 
+    years either side of the warming years. Data is aggregated to annual 
+    values. Longitude is shifted from [0 360] to [-180 180]. Includes the 
+    option of saving the data to file. This function only supports variables 
+    with units of K (e.g. temperature variables) or kg m-2 s-1 (e.g. 
+    precipitation) at this time.
+
+    Args:
+        model (string) : name of the CMIP6 model to download data for (e.g. 
+        'ACCESS-CM2')
     
-    # returns an xarray dataset (and/or saves a netcdf file) of the warming years (annual) timeseries of the cmip6 variable with lat/lon
+        member (string) : ensemble member (aka realization) to downlaod data 
+        for (e.g. 'r1i1p1f1')
+        
+        scenario (string) : CMIP6 scenario to download data for (e.g. 
+        'historical' or 'ssp585')
+    
+        cmip6_variable (string) : name of the CMIP6 variable to download data 
+        for (e.g. 'tas' or 'pr')
+        
+        warming_years (array) : numpy array of years to download data for. 
+        Years do not need to be consecutive. (e.g. [2010,2014,2020,2021])
+        
+        year_window (int) : integer specifying additional years to include 
+        either side of each specified warming years. For example, if 
+        warming_years = [2010,2017] and year_window=0, then only data for 
+        years 2010 and 2017 will be included. If warming_years = [2010,2017] 
+        and year_window=2, then data within +/- 2 years of the warming_years 
+        will be included (i.e 
+        [2008,2009,2010,2011,2012,2015,2016,2017,2018,2019])
+        
+        outfilename (string) : file name to save data to. If outfilename=None, 
+        data will be returned but not saved to file. Otherwise it should end 
+        in '.nc'. 
+        
+    Returns:
+        An xarray dataset (and can save a netcdf file) of global (spatially 
+        explicit) warming years (annual) timeseries of the CMIP6 variable for 
+        the specified model, member, and scenario.
+        
+    Raises:
+        ValueError: If an output file name is specified but it does not end in 
+        '.nc'.
+        
+        ValueError: If data for the specified 
+        model/member/scenario/variable/years combination is not available from 
+        Google Cloud.
+        
+        ValueError: If the requested variable does not have units of K or kg 
+        m-2 s-1.
+
+    Example:
+        warming_year_data = get_cmip6_data_at_warming_years(model=
+        'ACCESS-CM2', member='r1i1p1f1', scenario='ssp585', 
+        cmip6_variable='tas', warming_years=np.array([2010,2021,2024]),  
+        year_window=5, outfilename='mydata.nc')
+
+    """
 
     # check arguments
     member = member.lower()
