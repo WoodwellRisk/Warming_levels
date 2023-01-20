@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import fsspec
 import xarray as xr
+from file_control import gmst_table_dir
 
 
 def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
@@ -50,7 +51,7 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
     outdf['warming_year'] = np.nan
     
     # import the gmst data
-    gmst_table = pd.read_csv('/home/abbylute/alute_bucket/warming_levels/data/gmst_tables/CMIP6_GMST_table_all.csv')
+    gmst_table = pd.read_csv(gmst_table_dir + 'CMIP6_GMST_table_all.csv')
 
     # exclude years after 2100
     gmst_table = gmst_table.loc[gmst_table['year'] <= 2100]
@@ -114,7 +115,7 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     """
     
     # import the gmst data
-    gmst_table = pd.read_csv('/home/abbylute/alute_bucket/warming_levels/data/gmst_tables/CMIP6_GMST_table_all.csv')
+    gmst_table = pd.read_csv(gmst_table_dir + 'CMIP6_GMST_table_all.csv')
 
     # exclude years after 2100
     #gmst_table = gmst_table.loc[gmst_table['year'] <= 2100]
@@ -199,7 +200,7 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
     member = member.lower()
     scenario = scenario.lower()
     
-    if (scenario == 'historical') & ((int(start_yr_mo[0:4]) > 2014) | (int(end_yr_mo[0:4]) > 2014)):
+    if (scenario == 'historical') and ((int(start_yr_mo[0:4]) > 2014) or (int(end_yr_mo[0:4]) > 2014)):
         raise ValueError('When scenario="historical", start_yr_mo and end_yr_mo must reference dates before 2015')
     
     if (outfilename != None):
@@ -210,20 +211,20 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
     df = pd.read_csv('https://storage.googleapis.com/cmip6/cmip6-zarr-consolidated-stores.csv')
 
     # import cmip6 data
-    if (scenario != 'historical') & (int(start_yr_mo[0:4]) < 2015) & (int(end_yr_mo[0:4]) < 2015):
+    if (scenario != 'historical') and (int(start_yr_mo[0:4]) < 2015) and (int(end_yr_mo[0:4]) < 2015):
         print('Warning: due to the time window selected, all data will be imported from historical runs, not the specified scenario')
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == 'historical' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == 'historical' and source_id == '" + model + "' and member_id == '" + member + "'")
         zstore = df_zarr.zstore.values[0]
         mapper = fsspec.get_mapper(zstore)            
         zz = xr.open_zarr(mapper, consolidated=True)
-    elif (scenario != 'historical') & (int(start_yr_mo[0:4]) < 2015):
+    elif (scenario != 'historical') and (int(start_yr_mo[0:4]) < 2015):
         print('Warning: due to the time window selected, some data will be imported from historical runs, not the specified scenario')
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == 'historical' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == 'historical' and source_id == '" + model + "' and member_id == '" + member + "'")
         zstore = df_zarr.zstore.values[0]
         mapper = fsspec.get_mapper(zstore)            
         zh = xr.open_zarr(mapper, consolidated=True)
         
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == '" + scenario + "' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == '" + scenario + "' and source_id == '" + model + "' and member_id == '" + member + "'")
         zstore = df_zarr.zstore.values[0]
         mapper = fsspec.get_mapper(zstore)            
         zz = xr.open_zarr(mapper, consolidated=True)
@@ -231,7 +232,7 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
         zz = xr.concat([zh,zz], dim='time')
         zz['time'] = zz.time.astype("datetime64[ns]")
     else:
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == '" + scenario + "' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == '" + scenario + "' and source_id == '" + model + "' and member_id == '" + member + "'")
         zstore = df_zarr.zstore.values[0]
         mapper = fsspec.get_mapper(zstore)            
         zz = xr.open_zarr(mapper, consolidated=True)
@@ -368,7 +369,7 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     
     # import cmip6 data
     if len(yrsh)>0: # if there are any historical years
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == 'historical' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == 'historical' and source_id == '" + model + "' and member_id == '" + member + "'")
         
         if df_zarr.shape[0]==0:
             raise ValueError(cmip6_variable + ' data is not available from Google Cloud for ' + model + ', ' + member + ', for the historical period.')
@@ -378,7 +379,7 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
         zh = xr.open_zarr(mapper, consolidated=True)
         zh = zh.where(zh.time.dt.year.isin(yrsh), drop=True)
     if len(yrsf)>0: # if there are any future years
-        df_zarr = df.query("table_id == 'Amon' & variable_id == '" + cmip6_variable + "' & experiment_id == '" + scenario + "' & source_id == '" + model + "' & member_id == '" + member + "'")
+        df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == '" + scenario + "' and source_id == '" + model + "' and member_id == '" + member + "'")
         
         if df_zarr.shape[0]==0:
             raise ValueError(cmip6_variable + ' data is not available from Google Cloud for ' + model + ', ' + member + ', ' + scenario + '.')
