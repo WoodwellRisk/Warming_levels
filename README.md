@@ -28,7 +28,7 @@ This repository contains code for calculating global warming levels from CMIP6 d
 ![image](https://user-images.githubusercontent.com/30153868/209886751-b7b9e6bd-384b-44bb-a392-b65a195c4f1e.png)
 
 
-5. make_table_of_zarr_warming_years_21yr_window.ipynb makes a table (warming_years_zarr_21yr_window.csv) of warming years for each model, member, and scenario and for warming levels of 1, 1.5, 2, 2.5, 3, 3.5, 4, and 4.5°C using a 21 year moving window approach. A snapshot of this table is shown below.
+5. make_table_of_zarr_warming_years_yr_window.ipynb makes a table (warming_years_zarr_*x*yr_window.csv) of warming years for each model, member, and scenario and for warming levels of 1, 1.5, 2, 2.5, 3, 3.5, 4, and 4.5°C using a *x* year moving window approach. A snapshot of this table is shown below.
 
 ![image](https://user-images.githubusercontent.com/30153868/209886602-d2ca2d0c-7e83-45bc-ab81-bbb964e8197d.png)
 
@@ -40,7 +40,7 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
 8. output_warming_years_annual_pr_and_tas_datasets.ipynb creates datasets of mean annual temperature or annual precipitation for every possible model, member, scenario combination available on Google Cloud, for each warming year identified via a warming level and temperature tolerance approach, and for each lat/lon point on a common grid. This results in one dataset per model/member/scenario combination. From these datasets, the code also creates aggregated datasets that are the average across years and members (resulting in one file for each model and scenario).
 
-9. make_warming_year_table_for_21yr_best_subset.ipynb creates a table of warming years using the 21 year moving window approach and the best subset of models, members, and scenarios as described in the report. Can also be used for generating warming year tables for other moving windows (other than 21 years).
+9. make_warming_year_table_for_yr_window_best_subset.ipynb creates a table of warming years using the *x* year moving window approach and the best subset of models, members, and scenarios as described in the report.
 
 10. make_warming_year_table_for_temperature_window_best_subset.ipynb creates a table of warming years using the temperature window approach and the best subset of models, members, and scenarios as described in the report. Can be used for generating warming year tables for other temperature windows and warming levels.
 
