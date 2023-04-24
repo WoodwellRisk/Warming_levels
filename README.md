@@ -14,6 +14,8 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
    `get_cmip6_data_at_warming_years()` returns an xarray dataset of global (spatially explicit) annual data for the model, member, scenario, and variable specified. Data is returned for the warming years specified, of if year_window is a positive integer (>0) then a buffer of years around each warming year are also returned. The dataset can also be save to a file if desired.
 
+   `spatial_mean()` calculates the area weighted mean across lon and lat for arrays in an xarray dataset.
+
 2. make_table_of_CMIP6_zarr_models.ipynb makes a table (all_zarr_models.csv) of all CMIP6 model/member combinations that have monthly air temperature (tas) data available on Google Cloud. A snapshot of this table is shown below.
 
 ![image](https://user-images.githubusercontent.com/30153868/209983992-b840c4c5-b640-4cba-a9d0-9f8d703c2661.png)
