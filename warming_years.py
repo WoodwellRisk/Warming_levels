@@ -449,3 +449,32 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     
     return zz
     
+    
+
+def spatial_mean(data_on_grid):
+    """Calculate spatially weighted mean.
+    
+    This function calculates the area weighted spatial mean and is adapted
+    from 
+    https://docs.xarray.dev/en/stable/examples/area_weighted_temperature.html. 
+    The input dataset should contain lon and lat dimensions.
+
+    Args:
+        data_on_grid (xarray dataset) : xarray dataset containing data on a 
+        lon/lat grid to be averaged.
+        
+    Returns:
+        An xarray dataset containing the same data arrays as the input 
+        dataset, but spatially averaged.
+
+    Example:
+        global_mean_data = spatial_mean(my_xarray_dataset)
+
+    """
+    
+    weights = np.cos(np.deg2rad(data_on_grid.lat))
+    weights.name = "weights"
+    data_on_grid_weighted = data_on_grid.weighted(weights)
+    weighted_mean = data_on_grid_weighted.mean(("lon", "lat"))
+    
+    return weighted_mean
