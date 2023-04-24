@@ -153,7 +153,7 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     return outdf
     
 
-def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_mo, outfilename):
+def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_mo, outfilename=None):
     """Download CMIP6 data from Google Cloud.
     
     This function downloads monthly CMIP6 data from Google Cloud for the 
@@ -275,7 +275,7 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
     zz = zz.assign_coords(scenario=scenario).expand_dims('scenario')
 
     # option to save the file as a netcdf
-    if outfilename != None:
+    if outfilename is not None:
         print('writing file to ' + outfilename)
         zz.to_netcdf(outfilename)
     
@@ -448,7 +448,7 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     zz = zz.assign_coords(scenario=scenario).expand_dims('scenario')
 
     # option to save the file as a netcdf
-    if outfilename != None:
+    if outfilename is not None:
         print('writing file to ' + outfilename)
         zz.to_netcdf(outfilename)
     
