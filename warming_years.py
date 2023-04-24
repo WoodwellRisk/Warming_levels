@@ -8,7 +8,7 @@ import xarray as xr
 from file_control import gmst_table_dir
 
 
-def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
+def calc_warming_years_rolling_mean(mms_table, warming_level, window_size, max_year):
     """Calculate warming years using a rolling window approach.
     
     This function calculates warming years for each model/member/scenario 
@@ -32,6 +32,8 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
         rolling mean is assigned to the year (window_size/2)+1 (e.g. for 
         window_size=20, the rolling mean is assigned to the 11th year; same 
         approach as https://github.com/mathause/cmip_warming_levels)
+        
+        max_year (int) : last year to include in calculations.
     
     Returns: 
         A pandas dataframe that is the mms_table with one column added for the 
@@ -42,7 +44,8 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
         mms = pd.DataFrame({'model': ['ACCESS-CM2']*3,
                             'member': ['r1i1p1f1']*3,
                             'scenario': ['ssp126','ssp245','ssp585']})
-        warming_year_table = calc_warming_years_rolling_mean(mms, 1.5, 21)
+        warming_year_table = calc_warming_years_rolling_mean(mms, 1.5, 21,
+        2100)
     
     """
     
@@ -53,8 +56,8 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
     # import the gmst data
     gmst_table = pd.read_csv(gmst_table_dir + 'CMIP6_GMST_table_all.csv')
 
-    # exclude years after 2100
-    gmst_table = gmst_table.loc[gmst_table['year'] <= 2100]
+    # exclude years after max_year
+    gmst_table = gmst_table.loc[gmst_table['year'] <= max_year]
 
     # calculate warming for each year relative to 1850-1900 base period
     gmst_table['warming'] = gmst_table['GMST'] - gmst_table['1850-1900']
@@ -78,7 +81,7 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size):
     return outdf
 
 
-def calc_warming_years_temperature_window(mms_table, warming_level, temp_tolerance):
+def calc_warming_years_temperature_window(mms_table, warming_level, temp_tolerance, max_year):
     """Calculate warming years using a temperature window approach.
     
     This function calculates warming years for each model/member/scenario 
@@ -98,6 +101,8 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
         warming level that is used to identify warming years. For example, if 
         warming_level=2 and temp_tolerance=0.25, then years with warming 
         >1.75C and <2.25C will be selected
+        
+        max_year (int) : last year to include in calculations.
 
     Returns:
         A pandas dataframe that has the same columns as mms_table plus one 
@@ -110,15 +115,16 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
         mms = pd.DataFrame({'model': ['ACCESS-CM2']*3,
                             'member': ['r1i1p1f1']*3,
                             'scenario': ['ssp126','ssp245','ssp585']})
-        warming_year_table = calc_warming_years_temperature_window(mms, 1, .1)
+        warming_year_table = calc_warming_years_temperature_window(mms, 1, .1,
+        2100)
  
     """
     
     # import the gmst data
     gmst_table = pd.read_csv(gmst_table_dir + 'CMIP6_GMST_table_all.csv')
 
-    # exclude years after 2100
-    #gmst_table = gmst_table.loc[gmst_table['year'] <= 2100]
+    # exclude years after max_year
+    gmst_table = gmst_table.loc[gmst_table['year'] <= max_year]
 
     # calculate warming for each year relative to 1850-1900 base period
     gmst_table['warming'] = gmst_table['GMST'] - gmst_table['1850-1900']
