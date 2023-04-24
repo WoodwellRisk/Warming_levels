@@ -6,9 +6,9 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
 1. warming_years.py contains several useful utility functions. 
 
-   `calc_warming_years_rolling_mean()` calculates warming years using the commonly used approach of finding the first year when the rolling mean GMST centered on that year exceeds the target warming level. This function takes a model, member, scenario, target warming level, and number of years to average over.
+   `calc_warming_years_rolling_mean()` calculates warming years using the commonly used approach of finding the first year when the rolling mean GMST centered on that year exceeds the target warming level. This function takes a model, member, scenario, target warming level, number of years and latest year to average over.
 
-   `calc_warming_years_temperature_window()` calculates warming years by selecting any years that are within a temperature tolerance of the target warming level. It outputs all years that fit this criteria, allowing the user to average climate variables across these years or inspect difference between years at the target warming level. The function takes a model, member, scenario, target warming level, and temperature tolerance.
+   `calc_warming_years_temperature_window()` calculates warming years by selecting any years that are within a temperature tolerance of the target warming level. It outputs all years that fit this criteria, allowing the user to average climate variables across these years or inspect difference between years at the target warming level. The function takes a model, member, scenario, target warming level, temperature tolerance, and last year to include.
 
    `get_cmip6_data()` returns an xarray dataset of global (spatially explicit) monthly data for the model, member, scenario, variable and time period specified. It can also save the data to a file if desired.
 
