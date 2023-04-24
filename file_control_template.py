@@ -1,4 +1,8 @@
-# Template for a file_control.py file that can be imported to get file and directory locations
+# Template for a file_control.py file that can be imported to get file and directory locations. 
+
+# After this script is edited to include file paths, the script should be renamed file_control.py.
+
+# file paths can use forward or backward slashes and should not include a slash at the end.
 
 # List of file and directory locations
 
