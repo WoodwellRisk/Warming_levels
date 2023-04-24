@@ -209,9 +209,8 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
     if (scenario == 'historical') and ((int(start_yr_mo[0:4]) > 2014) or (int(end_yr_mo[0:4]) > 2014)):
         raise ValueError('When scenario="historical", start_yr_mo and end_yr_mo must reference dates before 2015')
     
-    if (outfilename != None):
-        if(outfilename[-3:] != '.nc'):
-            raise ValueError('If you wish to save the file, please specify an outfilename ending in ".nc" (i.e. a netcdf file)')           
+    if (outfilename is not None) and (outfilename[-3:] != '.nc'):
+        raise ValueError('If you wish to save the file, please specify an outfilename ending in ".nc" (i.e. a netcdf file)')           
     
     # Open the CMIP6 zarr data catatalog 
     df = pd.read_csv('https://storage.googleapis.com/cmip6/cmip6-zarr-consolidated-stores.csv')
