@@ -42,6 +42,9 @@ This repository contains code for calculating global warming levels from CMIP6 d
 
 10. output_aggregated_warming_level_datasets.ipynb ingests all the warming years in the 'best subset' warming year tables and averages across all models, members, scenarios, and years at once for each warming level to create two netCDF files: one for mean annual temperature and one for annual precipitation. Both contain data for each warming level on a 0.5° global grid.
 
+11. file_control_template.py allows the user to indicate file and directory locations. Once this file is edited to add these locations, the file should be saved as file_control.py. file_control.py is ingested by the other scripts in order to create paths to data inputs and outputs.
+
+
 ## Requirements
 Warming_levels codes are written in Python 3. The Python environment used to run the code is available in the warming_levels.yml file.
 
