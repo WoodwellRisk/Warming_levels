@@ -2,6 +2,10 @@
 
 This repository contains code for calculating global warming levels from CMIP6 data. CMIP6 data is sourced programatically from Google Cloud in zarr format. This repo contains functions for calculating global mean surface temperature (GMST), multiple approaches for calculating warming years, and functions for aggregating warming years to warming levels. The scripts described below are listed in roughly the order in which they should be run, although some scripts may be skipped depending on whether one is using tables that are already generated and depending on the warming year approach taken. A comprehensive description of this work is available in the report at https://docs.google.com/document/d/1NgpzSMPKjkMQFcNMlJDy8rcISbtpEHkQRuPF887OaXQ/edit#.
 
+Please check the github repository for the latest updates:
+https://github.com/abbylute/Warming_levels
+
+
 ## Content Description
 
 1. file_control_template.py allows the user to indicate file and directory locations. Once this file is edited to add these locations, the file should be saved as file_control.py. file_control.py is ingested by the other scripts in order to create paths to data inputs and outputs.
@@ -56,3 +60,8 @@ Please see Examples.ipynb.
 
 
 ## Citation Info
+Citation information is not yet available for this project. Please visit the github page to check for updates: https://github.com/abbylute/Warming_levels.
+
+
+## Contact Info
+Questions or comments should be directed to Abby Lute (alute@woodwellclimate.org) or Christopher Schwalm (cschwalm@woodwellclimate.org).
