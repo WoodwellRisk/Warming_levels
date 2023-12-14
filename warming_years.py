@@ -283,7 +283,7 @@ def get_cmip6_data(model, member, scenario, cmip6_variable, start_yr_mo, end_yr_
 
 
 
-def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, warming_years, year_window=0, outfilename=None):
+def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, warming_years, year_window=0, out_temporal_res='annual', outfilename=None):
     """Download CMIP6 data from Google Cloud for specific years.
     
     This function downloads monthly CMIP6 data from Google Cloud for the 
@@ -351,6 +351,9 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     member = member.lower()
     scenario = scenario.lower()
     
+    if out_temporal_res not in (['monthly','annual']):
+        raise ValueError('out_temporal_res must be "monthly" or "annual"')
+    
     # fill out warming_years list based on year_window
     if year_window > 0:
         for y in range(1,year_window + 1):
@@ -371,7 +374,7 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     # split historical and future warming_years
     yrsh = warming_years[warming_years < 2015]
     yrsf = warming_years[warming_years > 2014]
-    
+
     # import cmip6 data
     if len(yrsh)>0: # if there are any historical years
         df_zarr = df.query("table_id == 'Amon' and variable_id == '" + cmip6_variable + "' and experiment_id == 'historical' and source_id == '" + model + "' and member_id == '" + member + "'")
@@ -405,26 +408,34 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     # prepare time dimension
     # make sure time is sorted
     zz = zz.sortby('time')
+    # resample to month start to avoid issues with 360 day calendars
+    zz = zz.resample(time="MS").mean()
     if zz.time.dtype != '<M8[ns]':
-        zz['time'] = zz.indexes['time'].to_datetimeindex()
+        zz['time'] = zz.indexes['time'].to_datetimeindex(unsafe = True)
 
-    # aggregate monthly data to annual timeseries
-    if zz[cmip6_variable].units == 'K':
-        # weight months by days in month
-        month_length = zz.time.dt.days_in_month
-        weights = (month_length.groupby("time.year") / month_length.groupby("time.year").sum())
-        # Calculate the time-weighted average for each year
-        zz[cmip6_variable] = (zz[cmip6_variable] * weights).groupby("time.year").sum(dim="time")
-        zz[cmip6_variable].attrs = {'units':'K'}
-    elif zz[cmip6_variable].units == 'kg m-2 s-1':
+    if cmip6_variable == 'pr':
         # convert pr from kg m-2 s-1 to mm month-1
         sec_in_month = zz.time.dt.days_in_month * 24 * 60 * 60
         zz[cmip6_variable] = zz[cmip6_variable] * sec_in_month
-        # sum precipitation across months to get annual precipitation
-        zz[cmip6_variable] = zz[cmip6_variable].groupby("time.year").sum(dim="time")
         zz[cmip6_variable].attrs = {'units':'mm'}
-    else:
-        raise ValueError('This function does not know how to aggregate monthly data to annual for variables with units of ' + zz[cmip6_variable].units + '. Currently only units of K or kg m-2 s-1 are supported.')
+
+    # aggregate monthly data to annual timeseries
+    if out_temporal_res == 'annual':
+        if cmip6_variable in ['tas','tasmax','tasmin']:
+            # weight months by days in month
+            month_length = zz.time.dt.days_in_month
+            weights = (month_length.groupby("time.year") / month_length.groupby("time.year").sum())
+            # Calculate the time-weighted average for each year
+            zz[cmip6_variable] = (zz[cmip6_variable] * weights).groupby("time.year").sum(dim="time",min_count=1)
+            # include min_count above so that years where all months are nan become nan, not 0
+            zz[cmip6_variable].attrs = {'units':'K'}
+        elif cmip6_variable == 'pr':
+            # sum precipitation across months to get annual precipitation
+            zz[cmip6_variable] = zz[cmip6_variable].groupby("time.year").sum(dim="time",min_count=1)
+        else:
+            raise ValueError('This function does not know how to aggregate monthly data to annual for variables with units of ' + zz[cmip6_variable].units + '. Currently only units of K or kg m-2 s-1 are supported.')
+        zz = zz.drop('time',errors='ignore')
+
     
     # make sure that x and y are lon and lat for consistency
     try:
@@ -442,7 +453,7 @@ def get_cmip6_data_at_warming_years(model, member, scenario, cmip6_variable, war
     zz = zz.sortby(zz.lon)
     
     # clean up 
-    zz = zz.drop(['height','time','time_bounds','time_bnds','lat_bounds','lon_bounds'], errors='ignore')
+    zz = zz.drop(['height','time_bounds','time_bnds','lat_bounds','lon_bounds'], errors='ignore')
     zz = zz.assign_coords(model=model).expand_dims('model')
     zz = zz.assign_coords(member=member).expand_dims('member')
     zz = zz.assign_coords(scenario=scenario).expand_dims('scenario')
@@ -483,3 +494,183 @@ def spatial_mean(data_on_grid):
     weighted_mean = data_on_grid_weighted.mean(("lon", "lat"))
     
     return weighted_mean
+
+
+def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_temporal_res, max_year=2100, warming_year_type='moving_window', year_window=21, temp_window=0.5):
+    """ Create a netcdf file of CMIP6 data at a warming level.
+    
+    This function grabs CMIP6 data from Google Cloud for a set of 
+    model/member/scenario combinations for a given warming level, interpolates 
+    it to a common spatial grid, and combines it in a single xarray dataset or 
+    netcdf file with dimensions of time, model, member, scenario, lat, and 
+    lon.
+    
+    Args:
+        mms (pandas dataframe) : a pandas dataframe with three columns: 
+        'model', 'member', and 'scenario' filled with CMIP6 model names, CMIP6 
+        member names (also known as ensemble members or variant labels), and 
+        CMIP6 scenarios.
+    
+        cmip6_variable (str) : name of a CMIP6 variable to grab data for (e.g. 
+        'tas' or 'pr').
+    
+        warming_level (float) : A warming level in °C, calculated as the 
+        change in temperature since the pre-industrial period (1850-1900). 
+        (e.g. 1.5)
+    
+        outfn (str) : full path of the file name where outputs should be 
+        saved. If 'None', the outputs are returned but not saved.
+    
+        out_temporal_res (str) : Temporal resolution of the output data. 
+        Current options are 'annual' or 'monthly'
+    
+        max_year (int) : Latest year to include in the output dataset (e.g. 
+        2100)
+    
+        warming_year_type (str) : String indicating whether warming years 
+        should be calculated using a temporal window corresponding to a number 
+        of years (i.e. 'moving_window') or a temperature window that 
+        identifies years within a specified temperature tolerance of the 
+        warming level (i.e. 'temperature_window').
+
+        year_window (int) : Integer indicating the span of years that should  
+        be used with the 'moving_window' approach to identify warming levels 
+        (e.g. 21)
+    
+        temp_window (float) : The number of degrees C that should be used as a 
+        tolerance around the specified warming level to select years. (e.g. 
+        for a warming level of 2 and a temp_window of 0.5, all years with 
+        warming between 1.5 and 2.5 will be included)
+        
+    Returns:
+        An xarray dataset containing CMIP6 data for the variable and warming 
+        level of interest with dimensions time, model, scenario, member, lat, 
+        and lon.
+    
+    Example:
+        mms = pd.DataFrame({'model':['GFDL-CM4','FGOALS-g3'],
+                           'member':['r1i1p1f1','r1i1p1f1'],
+                           'scenario':['ssp245','ssp245']})
+        cmip6_variable = 'tas' #'pr'
+        warming_level = 2
+        outfn = '/path/to/output/output.nc'
+        out_temporal_res = 'monthly'
+        max_year = 2100
+        warming_year_type = 'moving_window'# 'temperature_window' # 
+        year_window = 21
+        temp_window = 0.5
+
+        get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, 
+                                   out_temporal_res, max_year, 
+                                   warming_year_type, year_window, 
+                                   temp_window)
+    """
+    
+
+    import os
+    import dask
+        
+   
+    # create new common grid to interpolate to
+    newlats = np.arange(-90, 90.01, .5)
+    newlons = np.arange(-180, 180, .5)
+
+    
+    # to remove warnings about chunk sizes
+    dask.config.set(**{'array.slicing.split_large_chunks': False})
+    
+            
+    # create warming year table
+    if warming_year_type == 'moving_window':
+        tab = calc_warming_years_rolling_mean(mms, warming_level, year_window, max_year).dropna()
+        # expand this so that it shows all years in the window
+        df = pd.DataFrame()
+        for r in range(tab.shape[0]):
+            row = tab.iloc[[r]]
+            row = row.reindex(row.index.repeat(year_window))
+            centeryear = row.warming_year.iloc[0]
+            if year_window % 2 == 0: # even window
+                styear = centeryear-year_window/2
+                enyear = centeryear+year_window/2 
+            else: # odd window
+                styear = centeryear-((year_window-1))/2
+                enyear = centeryear+((year_window-1)/2)+1
+            row.warming_year = np.arange(styear, enyear)
+            df = df.append(row)
+        tab = df.reset_index(drop=True)
+    elif warming_year_type == 'temperature_window':
+        tab = calc_warming_years_temperature_window(mms, warming_level, temp_window, max_year).dropna()
+        
+    # check if any model/member/scenarios were unavailable for the warming level
+    if tab.shape[0] == 0:
+        raise ValueError('None of the requested model/member/scenario combinations reached with specified warming level within the timespan of available data. Consider increasing the value of "max_year".')
+    else:                     
+        mmsavail = mms.merge(tab,how='left',indicator='avail')
+        if mmsavail[mmsavail['avail']!='both'].shape[0] > 0:
+            print('WARNING: ' + str(warming_level) + '°C warming level was not reached within the timespan of available data for the following model/member/scenario combination(s):')# + 
+            print(mmsavail[mmsavail['avail']!='both'][['model','member','scenario']])
+            print('consider increasing the value of "max_year" to see if there is additional data available\n')
+    
+    # remove model/member/scenario combinations that are available for tas
+    # (thus are in the warming year table) but aren't available for pr
+    if cmip6_variable == 'pr':
+        notavailable = tab.loc[(tab['model']=='NorESM2-LM') & 
+                               (tab['member']=='r1i1p1f1') & 
+                               (tab['scenario']=='ssp585')]
+        tab = tab.drop(notavailable.index)
+        notavailable = tab.loc[(tab['model']=='ACCESS-ESM1-5') & 
+                               (tab['member']=='r31i1p1f1') & 
+                               (tab['scenario']=='ssp585')]
+        tab = tab.drop(notavailable.index)
+    
+
+    # make table to loop through
+    iter_tab = tab[['model','member','scenario']].loc[tab['scenario']!='historical'].drop_duplicates()
+        
+    print('grabbing data...')
+    i = 0
+    for r in range(iter_tab.shape[0]):
+        mod = iter_tab['model'].iloc[r]
+        mem = iter_tab['member'].iloc[r]
+        scen = iter_tab['scenario'].iloc[r]
+        tab0 = tab.loc[(tab['model']==mod) & 
+                       (tab['member']==mem) & 
+                       (tab['scenario'].isin([scen,'historical']))]
+        warming_years = np.unique(tab0.warming_year.values)
+
+        # if the warming year for this model/member/scenario is not 
+        # reached (is nan), then skip to the next one
+        # otherwise:
+        if ~np.isnan(warming_years).all():
+            i = i+1
+            dat = get_cmip6_data_at_warming_years(tab0.model.iloc[0], 
+                                                  tab0.member.iloc[0], 
+                                                  tab0.scenario.iloc[0], 
+                                                  cmip6_variable, 
+                                                  warming_years, 
+                                                  year_window=0, 
+                                            out_temporal_res=out_temporal_res,
+                                            outfilename=None)
+
+            # interpolate to common spatial grid
+            dat = dat.interp(lon=newlons, lat=newlats, method="linear")
+
+            # remove lat and lon bounds since not all datasets have these 
+            # variables, and we changed the lat and lon anyway
+            dat = dat.drop(['lat_bnds','lon_bnds','bnds'],errors='ignore')
+            if i==1:
+                xout = dat
+            else:
+                xout = xr.concat([xout, dat], dim='scenario')
+                
+    if out_temporal_res == 'annual':
+        # convert years (int64) to dates (datetime64)
+        xout['year'] = pd.to_datetime(xout['year'],format="%Y")
+        xout = xout.rename({'year':'time'})
+
+    if outfn != None:
+        # save file
+        print('saving output to: ' + outfn)
+        xout.to_netcdf(outfn)
+    
+    return xout
