@@ -67,15 +67,38 @@ def calc_warming_years_rolling_mean(mms_table, warming_level, window_size, max_y
         mod = mms_table.iloc[i,0]
         mem = mms_table.iloc[i,1]
         scen = mms_table.iloc[i,2]
-    
-        tab1 = gmst_table.loc[(gmst_table['model']==mod) & (gmst_table['member']==mem) & ((gmst_table['scenario']==scen) | (gmst_table['scenario']=='historical')), :].copy()
+
+        tabf = gmst_table.loc[(gmst_table['model']==mod) & 
+                              (gmst_table['member']==mem) & 
+                              (gmst_table['scenario']==scen), :].copy()
+        tabh = gmst_table.loc[(gmst_table['model']==mod) & 
+                              (gmst_table['member']==mem) & 
+                              (gmst_table['scenario']=='historical'), 
+                              :].copy()
+        if tabf.shape[0] == 0:
+            print('tas data for ' + mod + ' ' + mem + ' ' + scen + 
+                  ' is not available on Google Cloud')
+        if tabh.shape[0] == 0:
+            print('tas data for ' + mod + ' ' + mem + 
+                  ' historical is not available on Google Cloud')                                                                                          
         
-        tab1['warming_mean'] = tab1['warming'].rolling(window_size, center=True).mean()
+        tab1 = gmst_table.loc[(gmst_table['model']==mod) & 
+                              (gmst_table['member']==mem) & 
+                              ((gmst_table['scenario']==scen) | 
+                              (gmst_table['scenario']=='historical')), 
+                              :].copy()
+        
+        tab1['warming_mean'] = tab1['warming'].rolling(window_size, 
+                                                       center=True).mean()
 
         tab1 = tab1.loc[tab1['warming_mean'] > warming_level]
+        
         if tab1.shape[0]>0:
             outdf.iloc[i,3] = tab1.iloc[0,3]
-        else:
+        elif (tab1.shape[0] == 0) & (tabf.shape[0]>0) & (tabh.shape[0]>0):
+            print(mod + ' ' + mem + ' ' + scen + ' does not reach the specified warming level before \n   "max_year" or the end of the available data, whichever comes first.')
+            print('   Consider increasing the value of "max_year" to see if there is additional data available.\n')
+        else: # if future or historical data was simply unavailable
             outdf.iloc[i,3] = np.nan
 
     return outdf
@@ -119,7 +142,8 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
         2100)
  
     """
-    
+    scen = mms_table['scenario'].drop_duplicates()
+
     # import the gmst data
     gmst_table = pd.read_csv(gmst_table_dir + 'CMIP6_GMST_table_all.csv')
 
@@ -133,19 +157,39 @@ def calc_warming_years_temperature_window(mms_table, warming_level, temp_toleran
     mms = mms_table.copy()
     
     # add historical scenario to mms_table so that historical warming years get incorporated as well
-    mms.loc[len(mms.index)] = [mms['model'].iloc[0], mms['member'].iloc[0], 'historical']
+    mmsh= mms.copy()
+    mmsh['scenario'] = 'historical'
+    mms= pd.concat([mms, mmsh])
 
     # select only model/member/scenario combinations that are in mms_table    
     gmst_table = pd.merge(gmst_table, mms, how='right', on=['model','member','scenario'])
+
+    # identify mms combos that are not available 
+    missing = gmst_table[gmst_table['year'].isnull()].drop_duplicates()
+    for r in range(missing.shape[0]):
+        print('tas data for ' + missing['model'].iloc[r] + ' ' + missing['member'].iloc[r] + ' ' + missing['scenario'].iloc[r] + ' is not available on Google Cloud')
 
     # filter to only years within temp_tolerance
     mn = warming_level - temp_tolerance
     mx = warming_level + temp_tolerance
     outdf = gmst_table.loc[(gmst_table['warming'] > mn) & (gmst_table['warming'] < mx)]
     
-    # add a row with warming_year=NaN for any model/member/scenario combination that did not have any warming years
+    # add a row with warming_year=NaN for any model/member/scenario combination that did not have any warming years (because unavailable or not reached)
     outdf = pd.merge(outdf, mms, how='outer', on = ['model','member','scenario'])
     
+    # identify cases where warming level was not reached
+    # first find the missing instances in the output table
+    missout = outdf[(outdf['year'].isnull()) & 
+                    (outdf['scenario'].isin(scen))].drop_duplicates()
+    # then subtract the instances that didn't have data available to get the instances that didn't reach the warming level
+    misswarm = pd.merge(missout,missing,how='outer', indicator=True)
+    misswarm = misswarm[misswarm['_merge']=='left_only']
+    for r in range(misswarm.shape[0]):
+        print(misswarm['model'].iloc[r] + ' ' + misswarm['member'].iloc[r] + 
+              ' ' + misswarm['scenario'].iloc[r] + 
+              ' does not reach the specified warming level before \n   "max_year" or the end of the available data, whichever comes first.')
+        print('   Consider increasing the value of "max_year" to see if there is additional data available.\n')
+
     # clean up the output dataframe
     outdf = outdf.drop(labels=['GMST','1850-1900','warming'], axis=1)
     outdf = outdf.rename(columns={'year':'warming_year'})
@@ -544,7 +588,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         
     Returns:
         An xarray dataset containing CMIP6 data for the variable and warming 
-        level of interest with dimensions time, model, scenario, member, lat, 
+        level of interest with dimensions time, model_member, scenario, lat, 
         and lon.
     
     Example:
@@ -596,33 +640,33 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
                 styear = centeryear-((year_window-1))/2
                 enyear = centeryear+((year_window-1)/2)+1
             row.warming_year = np.arange(styear, enyear)
-            df = df.append(row)
+            df = pd.concat([df,row])
         tab = df.reset_index(drop=True)
     elif warming_year_type == 'temperature_window':
         tab = calc_warming_years_temperature_window(mms, warming_level, temp_window, max_year).dropna()
-        
-    # check if any model/member/scenarios were unavailable for the warming level
-    if tab.shape[0] == 0:
-        raise ValueError('None of the requested model/member/scenario combinations reached with specified warming level within the timespan of available data. Consider increasing the value of "max_year".')
-    else:                     
-        mmsavail = mms.merge(tab,how='left',indicator='avail')
-        if mmsavail[mmsavail['avail']!='both'].shape[0] > 0:
-            print('WARNING: ' + str(warming_level) + '°C warming level was not reached within the timespan of available data for the following model/member/scenario combination(s):')# + 
-            print(mmsavail[mmsavail['avail']!='both'][['model','member','scenario']])
-            print('consider increasing the value of "max_year" to see if there is additional data available\n')
-    
-    # remove model/member/scenario combinations that are available for tas
-    # (thus are in the warming year table) but aren't available for pr
+
+
     if cmip6_variable == 'pr':
-        notavailable = tab.loc[(tab['model']=='NorESM2-LM') & 
-                               (tab['member']=='r1i1p1f1') & 
-                               (tab['scenario']=='ssp585')]
-        tab = tab.drop(notavailable.index)
-        notavailable = tab.loc[(tab['model']=='ACCESS-ESM1-5') & 
-                               (tab['member']=='r31i1p1f1') & 
-                               (tab['scenario']=='ssp585')]
-        tab = tab.drop(notavailable.index)
+        # list of mms available for tas but not for pr
+        nopr = pd.DataFrame({'model':['NorESM2-LM','ACCESS-ESM1-5'],
+                             'member':['r1i1p1f1','r31i1p1f1'],
+                             'scenario':['ssp585','ssp585']})
+
+        #identify rows in mms that are in nopr
+        checkdf = pd.merge(tab,nopr,how='left',indicator=True)
+        badpr = checkdf[checkdf['_merge']=='both']
+        for r in range(badpr.shape[0]):
+            mod = badpr['model'].iloc[r]
+            mem = badpr['member'].iloc[r]
+            scen = badpr['scenario'].iloc[r]
+            print('pr data for ' + mod + ' ' + mem + ' ' + scen + ' is not available on Google Cloud')
+        # remove rows that aren't available
+        tab = checkdf[checkdf['_merge']=='left_only'].drop('_merge',axis=1)
     
+    
+    if tab.shape[0] == 0:
+        raise ValueError('None of the requested model/member/scenario combinations were available from Google Cloud or reached the specified warming level within the timespan of available data. Consider increasing the value of "max_year".')
+
 
     # make table to loop through
     iter_tab = tab[['model','member','scenario']].loc[tab['scenario']!='historical'].drop_duplicates()
@@ -630,6 +674,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
     print('grabbing data...')
     i = 0
     for r in range(iter_tab.shape[0]):
+        i = i+1
         mod = iter_tab['model'].iloc[r]
         mem = iter_tab['member'].iloc[r]
         scen = iter_tab['scenario'].iloc[r]
@@ -638,31 +683,30 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
                        (tab['scenario'].isin([scen,'historical']))]
         warming_years = np.unique(tab0.warming_year.values)
 
-        # if the warming year for this model/member/scenario is not 
-        # reached (is nan), then skip to the next one
-        # otherwise:
-        if ~np.isnan(warming_years).all():
-            i = i+1
-            dat = get_cmip6_data_at_warming_years(tab0.model.iloc[0], 
-                                                  tab0.member.iloc[0], 
-                                                  tab0.scenario.iloc[0], 
-                                                  cmip6_variable, 
-                                                  warming_years, 
-                                                  year_window=0, 
-                                            out_temporal_res=out_temporal_res,
-                                            outfilename=None)
+        dat = get_cmip6_data_at_warming_years(tab0.model.iloc[0], 
+                                              tab0.member.iloc[0], 
+                                              tab0.scenario.iloc[0], 
+                                              cmip6_variable, 
+                                              warming_years, 
+                                              year_window=0, 
+                                        out_temporal_res=out_temporal_res,
+                                        outfilename=None)
 
-            # interpolate to common spatial grid
-            dat = dat.interp(lon=newlons, lat=newlats, method="linear")
+        # interpolate to common spatial grid
+        dat = dat.interp(lon=newlons, lat=newlats, method="linear")
 
-            # remove lat and lon bounds since not all datasets have these 
-            # variables, and we changed the lat and lon anyway
-            dat = dat.drop(['lat_bnds','lon_bnds','bnds'],errors='ignore')
-            if i==1:
-                xout = dat
-            else:
-                xout = xr.concat([xout, dat], dim='scenario')
-                
+        # condense model and member into one dimension to save space
+        dat = dat.stack(model_member = ['model','member'])
+
+        # remove lat and lon bounds since not all datasets have these 
+        # variables, and we changed the lat and lon anyway
+        dat = dat.drop(['lat_bnds','lon_bnds','bnds'],errors='ignore')
+        if i==1:
+            xout = dat
+        else:
+            xout = xr.concat([xout, dat], dim='model_member')
+
+            
     if out_temporal_res == 'annual':
         # convert years (int64) to dates (datetime64)
         xout['year'] = pd.to_datetime(xout['year'],format="%Y")
@@ -671,6 +715,20 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
     if outfn != None:
         # save file
         print('saving output to: ' + outfn)
-        xout.to_netcdf(outfn)
+
+        xout = encode_multiindex(xout,'model_member')
+
+        xout.to_netcdf(outfn, encoding = {cmip6_variable:{"zlib":True}})
     
     return xout
+
+
+def encode_multiindex(ds, idxname):
+    encoded = ds.reset_index(idxname)
+    coords = dict(zip(ds.indexes[idxname].names, ds.indexes[idxname].levels))
+    for coord in coords:
+        encoded[coord] = coords[coord].values
+    shape = [encoded.sizes[coord] for coord in coords]
+    encoded[idxname] = np.ravel_multi_index(ds.indexes[idxname].codes, shape)
+    encoded[idxname].attrs["compress"] = " ".join(ds.indexes[idxname].names)
+    return encoded
