@@ -546,7 +546,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
     This function grabs CMIP6 data from Google Cloud for a set of 
     model/member/scenario combinations for a given warming level, interpolates 
     it to a common spatial grid, and combines it in a single xarray dataset or 
-    netcdf file with dimensions of time, model, member, scenario, lat, and 
+    netcdf file with dimensions of time, model_member, scenario, lat, and 
     lon.
     
     Args:
