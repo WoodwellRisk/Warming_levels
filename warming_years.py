@@ -6,6 +6,7 @@ import pandas as pd
 import fsspec
 import xarray as xr
 from file_control import gmst_table_dir
+import dask
 
 
 def calc_warming_years_rolling_mean(mms_table, warming_level, window_size, max_year):
@@ -541,13 +542,13 @@ def spatial_mean(data_on_grid):
 
 
 def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_temporal_res, max_year=2100, warming_year_type='moving_window', year_window=21, temp_window=0.5):
-    """ Create a netcdf file of CMIP6 data at a warming level.
+    """ Create a zarr file of CMIP6 data at a warming level.
     
     This function grabs CMIP6 data from Google Cloud for a set of 
     model/member/scenario combinations for a given warming level, interpolates 
     it to a common spatial grid, and combines it in a single xarray dataset or 
-    netcdf file with dimensions of time, model_member, scenario, lat, and 
-    lon.
+    set of zarr files with dimensions of time, model, member, scenario, lat, 
+    and lon.
     
     Args:
         mms (pandas dataframe) : a pandas dataframe with three columns: 
@@ -562,7 +563,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         change in temperature since the pre-industrial period (1850-1900). 
         (e.g. 1.5)
     
-        outfn (str) : full path of the file name where outputs should be 
+        outfn (str) : full path of the directory where outputs should be 
         saved. If 'None', the outputs are returned but not saved.
     
         out_temporal_res (str) : Temporal resolution of the output data. 
@@ -588,7 +589,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         
     Returns:
         An xarray dataset containing CMIP6 data for the variable and warming 
-        level of interest with dimensions time, model_member, scenario, lat, 
+        level of interest with dimensions time, model, member, scenario, lat, 
         and lon.
     
     Example:
@@ -597,7 +598,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
                            'scenario':['ssp245','ssp245']})
         cmip6_variable = 'tas' #'pr'
         warming_level = 2
-        outfn = '/path/to/output/output.nc'
+        outfn = '/path/to/output/'
         out_temporal_res = 'monthly'
         max_year = 2100
         warming_year_type = 'moving_window'# 'temperature_window' # 
@@ -609,11 +610,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
                                    warming_year_type, year_window, 
                                    temp_window)
     """
-    
-
-    import os
-    import dask
-        
+            
    
     # create new common grid to interpolate to
     newlats = np.arange(-90, 90.01, .5)
@@ -696,7 +693,7 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         dat = dat.interp(lon=newlons, lat=newlats, method="linear")
 
         # condense model and member into one dimension to save space
-        dat = dat.stack(model_member = ['model','member'])
+        #dat = dat.stack(model_member = ['model','member'])
 
         # remove lat and lon bounds since not all datasets have these 
         # variables, and we changed the lat and lon anyway
@@ -704,7 +701,9 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         if i==1:
             xout = dat
         else:
-            xout = xr.concat([xout, dat], dim='model_member')
+            xout = xr.merge([xout,dat])
+            #xout = xr.concat([xout, dat], dim='model_member')
+            #xout = xr.concat([xout, dat], dim='new').drop_dims('new')
 
             
     if out_temporal_res == 'annual':
@@ -716,19 +715,35 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         # save file
         print('saving output to: ' + outfn)
 
-        xout = encode_multiindex(xout,'model_member')
+        #xout = encode_multiindex(xout,'model_member').chunk(chunks='auto')
+        xout = xout.chunk(chunks='auto')
+        
+        
+        import zarr
+        compressor = zarr.Blosc(cname="zlib")
 
-        xout.to_netcdf(outfn, encoding = {cmip6_variable:{"zlib":True}})
+        xout.to_zarr(outfn, 
+                     group=cmip6_variable,
+                     encoding={cmip6_variable: {"compressor": compressor}})
+#                     encoding = {cmip6_variable:{"zlib":True}})
+        #xout.to_netcdf(outfn, encoding = {cmip6_variable:{"zlib":True}})
+  
+    # add a hint about how to work with the output dataset
+    print("\nTo make working with this dataset easier, create a multiindex from model and member and then drop the combos that are not in the dataset:\n ds.stack(model_member = ['model','member']).dropna('model_member',how='all')")
+    
+    print("\nTo import the saved zarr file:\n import xarray as xr\n ds = xr.open_zarr(outfn, group=cmip6_variable)")
+    
+    print("\nDone")
     
     return xout
 
 
-def encode_multiindex(ds, idxname):
-    encoded = ds.reset_index(idxname)
-    coords = dict(zip(ds.indexes[idxname].names, ds.indexes[idxname].levels))
-    for coord in coords:
-        encoded[coord] = coords[coord].values
-    shape = [encoded.sizes[coord] for coord in coords]
-    encoded[idxname] = np.ravel_multi_index(ds.indexes[idxname].codes, shape)
-    encoded[idxname].attrs["compress"] = " ".join(ds.indexes[idxname].names)
-    return encoded
+#def encode_multiindex(ds, idxname):
+#    encoded = ds.reset_index(idxname)
+#    coords = dict(zip(ds.indexes[idxname].names, ds.indexes[idxname].levels))
+#    for coord in coords:
+#        encoded[coord] = coords[coord].values
+#    shape = [encoded.sizes[coord] for coord in coords]
+#    encoded[idxname] = np.ravel_multi_index(ds.indexes[idxname].codes, shape)
+#    encoded[idxname].attrs["compress"] = " ".join(ds.indexes[idxname].names)
+#    return encoded
