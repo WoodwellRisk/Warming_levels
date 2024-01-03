@@ -556,8 +556,8 @@ def get_cmip6_at_warming_level(mms, cmip6_variable, warming_level, outfn, out_te
         member names (also known as ensemble members or variant labels), and 
         CMIP6 scenarios.
     
-        cmip6_variable (str) : name of a CMIP6 variable to grab data for (e.g. 
-        'tas' or 'pr').
+        cmip6_variable (str) : name of a CMIP6 variable to grab data for (must 
+        be 'tas', 'tasmin', 'tasmax', or 'pr').
     
         warming_level (float) : A warming level in °C, calculated as the 
         change in temperature since the pre-industrial period (1850-1900). 
