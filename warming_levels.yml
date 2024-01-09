@@ -16,6 +16,7 @@ dependencies:
   - xarray
   - zarr
   - netCDF4
+  - xesmf
 
   # specialty
   - fsspec
