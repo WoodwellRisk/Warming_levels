@@ -22,6 +22,8 @@ https://github.com/abbylute/Warming_levels
 
    `spatial_mean()` calculates the area weighted mean across lon and lat for arrays in an xarray dataset.
 
+   `get_cmip6_at_warming_level()` creates an xarray dataset of CMIP6 data at a warming level. Can also save the data to a zarr file.
+
 3. make_table_of_CMIP6_zarr_models.ipynb makes a table (all_zarr_models.csv) of all CMIP6 model/member combinations that have monthly air temperature (tas) data available on Google Cloud. A snapshot of this table is shown below.
 
 ![image](https://user-images.githubusercontent.com/30153868/209983992-b840c4c5-b640-4cba-a9d0-9f8d703c2661.png)
