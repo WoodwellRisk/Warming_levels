@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11061678.svg)](https://doi.org/10.5281/zenodo.11061678)
+
 # Warming_levels
 
 This repository contains code for calculating global warming levels from CMIP6 data. CMIP6 data is sourced programatically from Google Cloud in zarr format. This repo contains functions for calculating global mean surface temperature (GMST), multiple approaches for calculating warming years, and functions for aggregating warming years to warming levels. The scripts described below are listed in roughly the order in which they should be run, although some scripts may be skipped depending on whether one is using tables that are already generated and depending on the warming year approach taken. A comprehensive description of this work is available in the report at https://docs.google.com/document/d/1NgpzSMPKjkMQFcNMlJDy8rcISbtpEHkQRuPF887OaXQ/edit#.
